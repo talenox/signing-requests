@@ -3,10 +3,11 @@ import { Buffer } from "node:buffer";
 const encoder = new TextEncoder();
 
 // How long an HMAC token should be valid for, in seconds
-const EXPIRY = 60;
+const EXPIRY = 600; // 10 minutes
 
 interface Env {
 	SECRET_DATA: string;
+	YOUR_BUCKET: R2Bucket;
 }
 export default {
 	async fetch(request, env): Promise<Response> {
@@ -27,6 +28,24 @@ export default {
 		);
 
 		const url = new URL(request.url);
+		const path = url.pathname;
+		
+		// Public assets can be accessed directly
+		if (path.startsWith("/assets/")) {
+			const objectKey = path.substring(1); // Remove leading slash
+			const object = await env.YOUR_BUCKET.get(objectKey);
+			
+			if (object === null) {
+				return new Response("Object Not Found", { status: 404 });
+			}
+			
+			return new Response(object.body, {
+				headers: {
+					"Content-Type": object.httpMetadata?.contentType || "application/octet-stream",
+					"Cache-Control": "public, max-age=86400"
+				}
+			});
+		}
 
 		// This is a demonstration Worker that allows unauthenticated access to /generate
 		// In a real application you would want to make sure that
@@ -55,10 +74,10 @@ export default {
 
 			return new Response(`${url.pathname}${url.search}`);
 			// Verify all non /generate requests
-		} else {
+		} else if (path.startsWith("/uploads/") || path.startsWith("/invoices/")) {
 			// Make sure you have the minimum necessary query parameters.
 			if (!url.searchParams.has("verify")) {
-				return new Response("Missing query parameter", { status: 403 });
+				return new Response("Authentication required", { status: 403 });
 			}
 
 			const [timestamp, hmac] = url.searchParams.get("verify").split("-");
@@ -85,15 +104,31 @@ export default {
 				return new Response("Invalid MAC", { status: 403 });
 			}
 
-			// Signed requests expire after one minute. Note that this value should depend on your specific use case
+			// Signed requests expire after ten minutes
 			if (Date.now() / 1000 > assertedTimestamp + EXPIRY) {
 				return new Response(
 					`URL expired at ${new Date((assertedTimestamp + EXPIRY) * 1000)}`,
 					{ status: 403 },
 				);
 			}
+			
+			// After verification succeeds:
+			const objectKey = path.substring(1);
+			const object = await env.YOUR_BUCKET.get(objectKey);
+			
+			if (object === null) {
+				return new Response("Object Not Found", { status: 404 });
+			}
+			
+			return new Response(object.body, {
+				headers: {
+					"Content-Type": object.httpMetadata?.contentType || "application/octet-stream",
+					"Cache-Control": "private, no-store"
+				}
+			});
 		}
 
-		return fetch(new URL(url.pathname, "https://example.com"), request);
+		// Reject all other paths
+		return new Response("Access denied", { status: 403 });
 	},
 } satisfies ExportedHandler<Env>;
