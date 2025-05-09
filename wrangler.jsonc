@@ -47,4 +47,12 @@
 	 * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
 	 */
 	// "services": [{ "binding": "MY_SERVICE", "service": "my-service" }]
+
+	"r2_buckets": [
+		{
+			"binding": "THE_R2BUCKET",
+			"bucket_name": "ipoh-assets-talenox-com",
+			"preview_bucket_name": "ipoh-assets-talenox-com"
+		}
+	]
 }
