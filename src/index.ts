@@ -7,7 +7,7 @@ const EXPIRY = 600; // 10 minutes
 
 interface Env {
 	SECRET_DATA: string;
-	YOUR_BUCKET: R2Bucket;
+	THE_R2BUCKET: R2Bucket;
 }
 export default {
 	async fetch(request, env): Promise<Response> {
@@ -33,7 +33,7 @@ export default {
 		// Public assets can be accessed directly
 		if (path.startsWith("/assets/")) {
 			const objectKey = path.substring(1); // Remove leading slash
-			const object = await env.YOUR_BUCKET.get(objectKey);
+			const object = await env.THE_R2BUCKET.get(objectKey);
 			
 			if (object === null) {
 				return new Response("Object Not Found", { status: 404 });
@@ -114,7 +114,7 @@ export default {
 			
 			// After verification succeeds:
 			const objectKey = path.substring(1);
-			const object = await env.YOUR_BUCKET.get(objectKey);
+			const object = await env.THE_R2BUCKET.get(objectKey);
 			
 			if (object === null) {
 				return new Response("Object Not Found", { status: 404 });
